@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { canStartNewGame, joinGameInChat } from './gamemanager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,7 +75,7 @@ export function getWcgMenu(greeting, isGroup) {
         `• \`stop\`         — Cancel or terminate the game (or \`.wcg end\`)\n` +
         `• \`surrender\`    — Forfeit your turn in an active match\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `💡 *Universal Controls:* \`stop\` and \`surrender\` work with or without a dot (\`.\`).\n` +
+        `💡 *Universal Controls:* \`join\`, \`stop\`, and \`surrender\` work with or without a dot (\`.\`).\n` +
         `💡 *Navigation:* Type \`.help\` for the main assistant directory.`
     );
 }
@@ -410,7 +411,7 @@ export function isPlayerInWordChain(userJid, chatJid) {
     return game.players.some(p => p.id === userJid && !p.eliminated);
 }
 
-function mentionjid(jid) {
+export function mentionjid(jid) {
     return '@' + jid.split('@')[0];
 }
 
@@ -611,28 +612,7 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
 
     // 4. MANUAL JOIN COMMAND (.wcg join)
     if (subCommand === 'join') {
-        const game = activeGames.get(chatJid);
-        if (!game) {
-            await socket.sendMessage(chatJid, { text: '❌ No game lobby to join! Type *.wcg start* to open one.' }, { quoted: msg });
-            return;
-        }
-
-        if (game.gameState !== 'waiting') {
-            await socket.sendMessage(chatJid, { text: '❌ The game is already in progress!' }, { quoted: msg });
-            return;
-        }
-
-        if (game.addPlayer(userJid, pushName)) {
-            await socket.sendMessage(chatJid, {
-                text: `🙋‍♂️ ${mentionjid(userJid)} joined the game! 👏 (Total: ${game.players.length})`,
-                mentions: [userJid]
-            }, { quoted: msg });
-        } else {
-            await socket.sendMessage(chatJid, {
-                text: `⚠️ ${mentionjid(userJid)} You have already joined!`,
-                mentions: [userJid]
-            }, { quoted: msg });
-        }
+        await joinGameInChat(socket, chatJid, userJid, pushName, msg, isGroup, true);
         return;
     }
 
@@ -645,6 +625,10 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
             }, { quoted: msg });
             return;
         }
+
+        // Enforce single-game-at-a-time rule
+        const canStart = await canStartNewGame(socket, chatJid, userJid, 'wcg', msg);
+        if (!canStart) return;
 
         // If a game already exists in this chat
         if (activeGames.has(chatJid)) {

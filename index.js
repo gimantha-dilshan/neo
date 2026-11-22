@@ -15,9 +15,10 @@ import {
 import pino from 'pino';
 import readline from 'readline';
 import { askGemini, generateAIImage } from './gemini.js';
-import { handleTicTacToeCommand, handleTicTacToeMove } from './tictactoe.js';
-import { handleConnectFourCommand, handleConnectFourMove } from './connectfour.js';
-import { handleWordChainCommand, handleWordChainWord, initWordChain } from './wordchain.js';
+import { handleTicTacToeCommand } from './tictactoe.js';
+import { handleConnectFourCommand } from './connectfour.js';
+import { handleWordChainCommand, initWordChain } from './wordchain.js';
+import { handleGameMessage } from './gamemanager.js';
 import {
     initDB,
     saveMessage,
@@ -396,18 +397,10 @@ async function connectToWhatsApp() {
             else {
                 const text = (content.conversation || content.extendedTextMessage?.text || "").trim();
 
-                // Check if user is in an active TicTacToe game and sending a move or surrender
+                // Intercept game actions (universal join, stop/end, surrender, or in-game moves)
                 if (text) {
-                    const isTttMove = await handleTicTacToeMove(socket, chatJid, userJid, text, msg, isGroup);
-                    if (isTttMove) return;
-
-                    // Check if user is in an active Connect Four game and sending a move or surrender
-                    const isC4Move = await handleConnectFourMove(socket, chatJid, userJid, text, msg, isGroup);
-                    if (isC4Move) return;
-
-                    // Check if message is a Word Chain word, lobby join, or surrender
-                    const isWcgAction = await handleWordChainWord(socket, chatJid, userJid, pushName, text, msg, isGroup);
-                    if (isWcgAction) return;
+                    const isGameAction = await handleGameMessage(socket, chatJid, userJid, pushName, text, msg, isGroup);
+                    if (isGameAction) return;
                 }
 
                 // If text does not start with '.', IGNORE IT!

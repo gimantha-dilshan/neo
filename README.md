@@ -67,7 +67,7 @@ Upon startup, if not already paired, Neo will generate an 8-character pairing co
 | `1-9` or `.1-.9` | Place your mark on the Tic-Tac-Toe board during your turn |
 | `.wcg` | Open Word Chain Game menu with instructions & rules |
 | `.wcg start` | Start a new Word Chain lobby in group (or force-start when 2+ joined) |
-| `join` | Join an open Word Chain Game lobby |
+| `join` / `.join` | Join any open game lobby in a group (Connect Four, Tic-Tac-Toe, or Word Chain) |
 | `<word>` | Submit an English word starting with the target letter |
 | `.wcg stats` | View current Word Chain game statistics and progress |
 | `stop` / `.stop` / `end` | Stop and terminate any active game (works with or without dot) |

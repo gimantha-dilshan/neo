@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { canStartNewGame, joinGameInChat } from './gamemanager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,14 +62,15 @@ export function getC4Menu(greeting, isGroup) {
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `*COMMANDS & CONTROLS*\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `• \`.c4 start\`  — Create or join a 2-player match (or \`.c4 play\`)\n` +
+        `• \`.c4 start\`  — Create a 2-player match (or \`.c4 play\`)\n` +
+        `• \`join\`       — Join an open game lobby in this group\n` +
         `• \`.c4 @user\`  — Challenge a specific friend directly\n` +
         `• \`.c4 bot\`    — Play solo against Neo AI (🔴 You vs 🟡 Neo)\n` +
         `• \`1\` to \`7\`    — Drop your disk into that column (1 to 7)\n` +
         `• \`stop\`         — Terminate the match (or \`.c4 end\`)\n` +
         `• \`surrender\`    — Forfeit the active match\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `💡 *Universal Controls:* \`stop\` and \`surrender\` work anytime with or without a dot (\`.\`).\n` +
+        `💡 *Universal Controls:* \`join\`, \`stop\`, and \`surrender\` work anytime with or without a dot (\`.\`).\n` +
         `💡 *Aliases:* \`.cgf\`, \`.connectfour\`, \`.c4\`\n` +
         `💡 *Navigation:* Type \`.help\` to view the main assistant directory.`
     );
@@ -202,7 +204,7 @@ export function getBestC4BotMove(game) {
 /**
  * Formats the 7x6 Connect Four board for WhatsApp with emojis
  */
-function formatC4Board(game) {
+export function formatC4Board(game) {
     const symbols = {
         'R': '🔴',
         'Y': '🟡',
@@ -240,6 +242,12 @@ export async function handleConnectFourCommand(socket, chatJid, userJid, pushNam
         const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
         const menuText = getC4Menu(greeting, isGroup);
         await sendC4MenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
+        return;
+    }
+
+    // 1.5 JOIN COMMAND (.c4 join)
+    if (subCommand === 'join') {
+        await joinGameInChat(socket, chatJid, userJid, pushName, msg, isGroup, true);
         return;
     }
 
@@ -305,6 +313,10 @@ export async function handleConnectFourCommand(socket, chatJid, userJid, pushNam
 
     // 5. BOT SOLO COMMAND (.c4 bot / .c4 ai)
     if (subCommand === 'bot' || subCommand === 'ai') {
+        // Enforce single-game-at-a-time rule
+        const canStart = await canStartNewGame(socket, chatJid, userJid, 'c4', msg);
+        if (!canStart) return;
+
         // Clean up any existing waiting room created by this user
         for (const [roomId, room] of c4Games.entries()) {
             if (room.chatJid === chatJid && room.game.playerR === userJid && room.state === 'WAITING') {
@@ -359,6 +371,10 @@ export async function handleConnectFourCommand(socket, chatJid, userJid, pushNam
         await sendC4MenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
         return;
     }
+
+    // Enforce single-game-at-a-time rule
+    const canStart = await canStartNewGame(socket, chatJid, userJid, 'c4', msg);
+    if (!canStart) return;
 
     // If user attempts multiplayer in a private chat (DM)
     if (!isGroup) {
@@ -444,7 +460,7 @@ export async function handleConnectFourCommand(socket, chatJid, userJid, pushNam
             `🎮 *Connect Four Room Created!*\n\n` +
             `👤 Challenged by: @${userTag}\n` +
             `⏳ Waiting for an opponent to join...\n\n` +
-            `👉 Type *.c4 start* to accept the challenge and play!`;
+            `👉 Type *join* to accept the challenge and play!`;
 
         await socket.sendMessage(chatJid, {
             text: waitText,

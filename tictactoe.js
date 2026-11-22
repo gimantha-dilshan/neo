@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { canStartNewGame, joinGameInChat } from './gamemanager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,14 +61,15 @@ export function getTttMenu(greeting, isGroup) {
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `*COMMANDS & CONTROLS*\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `• \`.ttt start\`  — Create or join a 2-player match (or \`.ttt play\`)\n` +
+        `• \`.ttt start\`  — Create a 2-player match (or \`.ttt play\`)\n` +
+        `• \`join\`       — Join an open game lobby in this group\n` +
         `• \`.ttt @user\`  — Challenge a specific friend directly\n` +
         `• \`.ttt bot\`    — Play solo against Neo AI\n` +
         `• \`1\` to \`9\`    — Place your symbol (❎ or ⭕) on your turn\n` +
         `• \`stop\`         — Cancel or terminate the match (or \`.ttt end\`)\n` +
         `• \`surrender\`    — Forfeit an active match\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `💡 *Universal Controls:* \`stop\` and \`surrender\` work anytime with or without a dot (\`.\`).\n` +
+        `💡 *Universal Controls:* \`join\`, \`stop\`, and \`surrender\` work anytime with or without a dot (\`.\`).\n` +
         `💡 *Navigation:* Type \`.help\` to view the main bot directory.`
     );
 }
@@ -219,7 +221,7 @@ function getBestBotMove(game) {
 /**
  * Formats the 3x3 board for WhatsApp with emojis
  */
-function formatBoard(game) {
+export function formatBoard(game) {
     const symbols = {
         'X': '❎',
         'O': '⭕',
@@ -267,6 +269,12 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
         const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
         const menuText = getTttMenu(greeting, isGroup);
         await sendTttMenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
+        return;
+    }
+
+    // 1.5 JOIN COMMAND (.ttt join)
+    if (subCommand === 'join') {
+        await joinGameInChat(socket, chatJid, userJid, pushName, msg, isGroup, true);
         return;
     }
 
@@ -332,6 +340,10 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
 
     // 5. BOT SOLO COMMAND (.ttt bot / .ttt ai)
     if (subCommand === 'bot' || subCommand === 'ai') {
+        // Enforce single-game-at-a-time rule
+        const canStart = await canStartNewGame(socket, chatJid, userJid, 'ttt', msg);
+        if (!canStart) return;
+
         // Clean up any existing waiting room created by this user
         for (const [roomId, room] of games.entries()) {
             if (room.chatJid === chatJid && room.game.playerX === userJid && room.state === 'WAITING') {
@@ -386,6 +398,10 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
         await sendTttMenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
         return;
     }
+
+    // Enforce single-game-at-a-time rule
+    const canStart = await canStartNewGame(socket, chatJid, userJid, 'ttt', msg);
+    if (!canStart) return;
 
     // If user attempts multiplayer in a private chat (DM)
     if (!isGroup) {
@@ -471,7 +487,7 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
             `🎮 *TicTacToe Room Created!*\n\n` +
             `👤 Challenged by: @${userTag}\n` +
             `⏳ Waiting for an opponent to join...\n\n` +
-            `👉 Type *.ttt* to accept the challenge and play!`;
+            `👉 Type *join* to accept the challenge and play!`;
 
         await socket.sendMessage(chatJid, {
             text: waitText,
