@@ -16,6 +16,7 @@ import pino from 'pino';
 import readline from 'readline';
 import { askGemini, generateAIImage } from './gemini.js';
 import { handleTicTacToeCommand, handleTicTacToeMove } from './tictactoe.js';
+import { handleConnectFourCommand, handleConnectFourMove } from './connectfour.js';
 import { handleWordChainCommand, handleWordChainWord, initWordChain } from './wordchain.js';
 import {
     initDB,
@@ -98,14 +99,15 @@ function getHelpMenu(greeting) {
         `• Reply to any picture with \`.<question>\`\n` +
         `  Identify objects, extract text, and solve equations.\n\n` +
         `🎮 *Arcade & Games*\n` +
-        `• \`.ttt\`  — Open Tic-Tac-Toe Menu (Play vs Neo AI or Friends)\n` +
-        `• \`.wcg\`  — Open Word Chain Menu (Multiplayer Group Battle)\n\n` +
+        `• \`.ttt\`  — Tic-Tac-Toe Menu (Play vs Neo AI or Friends)\n` +
+        `• \`.c4\`   — Connect Four Menu (Play vs Neo AI or Friends)\n` +
+        `• \`.wcg\`  — Word Chain Menu (Multiplayer Group Battle)\n\n` +
         `⚙️ *System & Diagnostics*\n` +
         `• \`.ping\`  — Test response latency & operational status\n` +
         `• \`.help\`  — Display this comprehensive directory\n` +
         `• \`.\`      — Quick summary & welcome card\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `🟢 *Status:* Online & Active  |  🌐 *Engine:* Gemini AI\n` +
+        `🟢 *Status:* Online & Active\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━`
     );
 }
@@ -124,7 +126,7 @@ function getQuickStartMenu(greeting) {
         `• *Generate Artwork:* \`.draw <prompt>\`\n` +
         `  _Example:_ \`.draw a futuristic neon supercar\`\n\n` +
         `• *Analyze Pictures:* Send/quote photo with \`.<question>\`\n\n` +
-        `• *Play Games:* Type \`.ttt\` for Tic-Tac-Toe or \`.wcg\` for Word Chain\n\n` +
+        `• *Play Games:* Type \`.ttt\`, \`.c4\`, or \`.wcg\`\n\n` +
         `• *Full Directory:* Type \`.help\` for complete command guide\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `🟢 *Status:* Online & Operational  |  ⚡ *Prefix:* \`.\``
@@ -399,6 +401,10 @@ async function connectToWhatsApp() {
                     const isTttMove = await handleTicTacToeMove(socket, chatJid, userJid, text, msg, isGroup);
                     if (isTttMove) return;
 
+                    // Check if user is in an active Connect Four game and sending a move or surrender
+                    const isC4Move = await handleConnectFourMove(socket, chatJid, userJid, text, msg, isGroup);
+                    if (isC4Move) return;
+
                     // Check if message is a Word Chain word, lobby join, or surrender
                     const isWcgAction = await handleWordChainWord(socket, chatJid, userJid, pushName, text, msg, isGroup);
                     if (isWcgAction) return;
@@ -424,7 +430,7 @@ async function connectToWhatsApp() {
                 // Pointer for game commands (.game / .games)
                 if (/^(game|games)(\s|$)/i.test(promptText)) {
                     await socket.sendMessage(chatJid, {
-                        text: `🎮 *Neo Games Directory:*\n\n• Type *.ttt* to open the Tic-Tac-Toe menu\n• Type *.wcg* to open the Word Chain Game menu`,
+                        text: `🎮 *Neo Games Directory:*\n\n• Type *.ttt* to open the Tic-Tac-Toe menu\n• Type *.c4* to open the Connect Four menu\n• Type *.wcg* to open the Word Chain Game menu`,
                         mentions: isGroup ? [userJid] : []
                     }, { quoted: msg });
                     return;
@@ -433,6 +439,12 @@ async function connectToWhatsApp() {
                 // Check for TicTacToe game command (.ttt / .tictactoe)
                 if (/^(ttt|tictactoe)(\s|$)/i.test(promptText)) {
                     await handleTicTacToeCommand(socket, chatJid, userJid, pushName, promptText, msg, isGroup);
+                    return;
+                }
+
+                // Check for Connect Four game command (.c4 / .cgf / .connectfour / .connect4)
+                if (/^(c4|cgf|connectfour|connect4)(\s|$)/i.test(promptText)) {
+                    await handleConnectFourCommand(socket, chatJid, userJid, pushName, promptText, msg, isGroup);
                     return;
                 }
 

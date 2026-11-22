@@ -57,6 +57,10 @@ Upon startup, if not already paired, Neo will generate an 8-character pairing co
 | Command | Action |
 |---|---|
 | `.<question>` | Ask Neo anything in DM or Group (e.g., `.Explain quantum computing simply`) |
+| `.c4` / `.cgf` | Open Connect Four menu with instructions & commands |
+| `.c4 start` | Start or join a 2-player Connect Four match in group |
+| `.c4 bot` | Play solo Connect Four against Neo AI (works in DMs & groups) |
+| `1-7` or `.1-.7` | Drop your disc into column 1–7 during your turn |
 | `.ttt` | Open Tic-Tac-Toe menu with instructions & commands |
 | `.ttt start` | Start or join a 2-player Tic-Tac-Toe match in group |
 | `.ttt bot` | Play solo Tic-Tac-Toe against Neo AI (works in DMs & groups) |
@@ -67,7 +71,7 @@ Upon startup, if not already paired, Neo will generate an 8-character pairing co
 | `<word>` | Submit an English word starting with the target letter |
 | `.wcg stats` | View current Word Chain game statistics and progress |
 | `stop` / `.stop` / `end` | Stop and terminate any active game (works with or without dot) |
-| `surrender` / `.surrender` | Forfeit your active Tic-Tac-Toe or Word Chain game |
+| `surrender` / `.surrender` | Forfeit your active game (Connect Four, Tic-Tac-Toe, or Word Chain) |
 | `.draw <prompt>` | Generate an AI image (e.g., `.draw an astronaut cat on Mars`) |
 | `.generate <prompt>` | Generate an AI image (e.g., `.generate cyberpunk neon city`) |
 | `[Image]` with `.<caption>` | Analyze or describe the attached image |
