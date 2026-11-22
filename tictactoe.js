@@ -3,6 +3,75 @@
  * Inspired by Knightbot-MD TicTacToe engine
  */
 
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const tttImagePath = path.join(__dirname, 'assets', 'ttt-menu-image.jpg');
+
+let cachedTttImage = null;
+
+function getTttImage() {
+    if (cachedTttImage) return cachedTttImage;
+    try {
+        if (fs.existsSync(tttImagePath)) {
+            cachedTttImage = fs.readFileSync(tttImagePath);
+            return cachedTttImage;
+        }
+    } catch (err) {
+        console.error('[ASSETS] Error loading TTT menu image:', err.message);
+    }
+    return null;
+}
+
+export async function sendTttMenuCard(socket, chatJid, captionText, quotedMsg, mentions = []) {
+    const imageBuffer = getTttImage();
+    if (imageBuffer) {
+        try {
+            return await socket.sendMessage(chatJid, {
+                image: imageBuffer,
+                caption: captionText,
+                mentions: mentions
+            }, { quoted: quotedMsg });
+        } catch (imgErr) {
+            console.error('[ASSETS] Failed to send TTT menu image, falling back to text:', imgErr.message);
+        }
+    }
+    return await socket.sendMessage(chatJid, {
+        text: captionText,
+        mentions: mentions
+    }, { quoted: quotedMsg });
+}
+
+export function getTttMenu(greeting, isGroup) {
+    const modeTip = isGroup
+        ? `👥 *Multiplayer:* Run *.ttt start* to open an open 2-player challenge in this group, or challenge a friend with *.ttt @user*.\n` +
+          `🤖 *Solo Mode:* Run *.ttt bot* to challenge Neo AI.`
+        : `🤖 *Solo Mode:* Run *.ttt bot* to challenge Neo AI here in DMs!\n` +
+          `👥 *Multiplayer:* Run *.ttt start* inside a WhatsApp group to challenge friends.`;
+
+    return (
+        `*NEO ARCADE*  •  _Tic-Tac-Toe (X/O)_\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Welcome ${greeting}! Play the classic 3x3 strategy game against friends or test your skills solo against Neo AI.\n\n` +
+        `${modeTip}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `*COMMANDS & CONTROLS*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `• \`.ttt start\`  — Create or join a 2-player match (or \`.ttt play\`)\n` +
+        `• \`.ttt @user\`  — Challenge a specific friend directly\n` +
+        `• \`.ttt bot\`    — Play solo against Neo AI\n` +
+        `• \`1\` to \`9\`    — Place your symbol (❎ or ⭕) on your turn\n` +
+        `• \`stop\`         — Cancel or terminate the match (or \`.ttt end\`)\n` +
+        `• \`surrender\`    — Forfeit an active match\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 *Universal Controls:* \`stop\` and \`surrender\` work anytime with or without a dot (\`.\`).\n` +
+        `💡 *Navigation:* Type \`.help\` to view the main bot directory.`
+    );
+}
+
 export class TicTacToe {
     constructor(playerX = 'x', playerO = 'o') {
         this.playerX = playerX;
@@ -193,16 +262,11 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
     const parts = commandText.trim().split(/\s+/);
     const subCommand = (parts[1] || "").toLowerCase();
 
-    // 1. HELP COMMAND
-    if (subCommand === 'help') {
-        const helpText =
-            `🎮 *TicTacToe (TTT) Commands:*\n\n` +
-            `• *.ttt* - Start a new game or join a waiting game\n` +
-            `• *.ttt bot* - Play solo against Neo AI\n` +
-            `• *.ttt cancel* - Cancel a game room you created\n` +
-            `• *.ttt surrender* - Surrender the current game\n` +
-            `• *1-9* - Type any number (1 to 9) on your turn to place your mark!`;
-        await socket.sendMessage(chatJid, { text: helpText }, { quoted: msg });
+    // 1. MENU & HELP COMMAND (.ttt / .ttt help / .ttt menu)
+    if (!subCommand || subCommand === 'help' || subCommand === 'menu') {
+        const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
+        const menuText = getTttMenu(greeting, isGroup);
+        await sendTttMenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
         return;
     }
 
@@ -311,7 +375,28 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
         return;
     }
 
-    // 5. CHECK FOR EXISTING WAITING ROOM IN THIS CHAT
+    // 6. MULTIPLAYER START (.ttt start / .ttt play / .ttt @user)
+    const isStartOrPlay = subCommand === 'start' || subCommand === 'play';
+    const isChallenge = commandText.includes('@');
+
+    // If no valid multiplayer start command given, display the TTT menu card
+    if (!isStartOrPlay && !isChallenge) {
+        const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
+        const menuText = getTttMenu(greeting, isGroup);
+        await sendTttMenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
+        return;
+    }
+
+    // If user attempts multiplayer in a private chat (DM)
+    if (!isGroup) {
+        await socket.sendMessage(chatJid, {
+            text: `🤖 *Tic-Tac-Toe in Private Chat:*\n\nTo play solo against Neo AI here in DMs, please send *.ttt bot*!\n\n_To challenge a human friend, run *.ttt start* inside a WhatsApp group chat._`,
+            mentions: [userJid]
+        }, { quoted: msg });
+        return;
+    }
+
+    // 7. CHECK FOR EXISTING WAITING ROOM IN THIS CHAT
     let waitingRoom = null;
     let waitingRoomId = null;
     for (const [id, r] of games.entries()) {

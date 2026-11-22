@@ -31,10 +31,8 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const botImagePath = path.join(__dirname, 'assets', 'bot-menu-image.jpg');
-const botGameImagePath = path.join(__dirname, 'assets', 'bot-game-menu.jpg');
 
 let cachedBotImage = null;
-let cachedBotGameImage = null;
 
 /**
  * Loads and caches the bot menu image buffer from assets/bot-menu-image.jpg
@@ -53,22 +51,6 @@ function getBotImage() {
 }
 
 /**
- * Loads and caches the bot game menu image buffer from assets/bot-game-menu.jpg
- */
-function getBotGameImage() {
-    if (cachedBotGameImage) return cachedBotGameImage;
-    try {
-        if (fs.existsSync(botGameImagePath)) {
-            cachedBotGameImage = fs.readFileSync(botGameImagePath);
-            return cachedBotGameImage;
-        }
-    } catch (err) {
-        console.error('[ASSETS] Error loading game menu image:', err.message);
-    }
-    return null;
-}
-
-/**
  * Sends a rich menu card with bot-menu-image.jpg if available, falling back to text
  */
 async function sendMenuCard(socket, chatJid, captionText, quotedMsg, mentions = []) {
@@ -82,28 +64,6 @@ async function sendMenuCard(socket, chatJid, captionText, quotedMsg, mentions = 
             }, { quoted: quotedMsg });
         } catch (imgErr) {
             console.error('[ASSETS] Failed to send image menu, falling back to text:', imgErr.message);
-        }
-    }
-    return await socket.sendMessage(chatJid, {
-        text: captionText,
-        mentions: mentions
-    }, { quoted: quotedMsg });
-}
-
-/**
- * Sends a rich game menu card with bot-game-menu.jpg if available, falling back to text
- */
-async function sendGameMenuCard(socket, chatJid, captionText, quotedMsg, mentions = []) {
-    const imageBuffer = getBotGameImage();
-    if (imageBuffer) {
-        try {
-            return await socket.sendMessage(chatJid, {
-                image: imageBuffer,
-                caption: captionText,
-                mentions: mentions
-            }, { quoted: quotedMsg });
-        } catch (imgErr) {
-            console.error('[ASSETS] Failed to send game menu image, falling back to text:', imgErr.message);
         }
     }
     return await socket.sendMessage(chatJid, {
@@ -137,9 +97,9 @@ function getHelpMenu(greeting) {
         `• Send image with \`.<question>\` in caption\n` +
         `• Reply to any picture with \`.<question>\`\n` +
         `  Identify objects, extract text, and solve equations.\n\n` +
-        `🎮 *Arcade & Multiplayer*\n` +
-        `• \`.game\` _(or \`.games\`)_\n` +
-        `  Open the Game Zone for Tic-Tac-Toe, Word Chain, and AI solo matches.\n\n` +
+        `🎮 *Arcade & Games*\n` +
+        `• \`.ttt\`  — Open Tic-Tac-Toe Menu (Play vs Neo AI or Friends)\n` +
+        `• \`.wcg\`  — Open Word Chain Menu (Multiplayer Group Battle)\n\n` +
         `⚙️ *System & Diagnostics*\n` +
         `• \`.ping\`  — Test response latency & operational status\n` +
         `• \`.help\`  — Display this comprehensive directory\n` +
@@ -147,40 +107,6 @@ function getHelpMenu(greeting) {
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `🟢 *Status:* Online & Active  |  🌐 *Engine:* Gemini AI\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━`
-    );
-}
-
-/**
- * Formats the dedicated game menu card (.game / .games)
- */
-function getGameMenu(greeting) {
-    return (
-        `*NEO ARCADE*  •  _Game Zone_\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `Welcome to the Arcade, ${greeting}! Challenge your friends in group chats or test your skills solo against Neo AI.\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `*AVAILABLE TITLES*\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `🕹️ *Tic-Tac-Toe (X/O)*\n` +
-        `Classic 3x3 strategy game with smart AI and multiplayer.\n` +
-        `• \`.ttt\` — Create or accept an open challenge\n` +
-        `• \`.ttt @user\` — Challenge a specific player\n` +
-        `• \`.ttt bot\` — Play solo against Neo AI\n` +
-        `• \`1\` to \`9\` — Place your symbol on your turn\n` +
-        `• \`stop\` or \`.stop\` — Stop / cancel active game (or \`end\`)\n` +
-        `• \`surrender\` or \`.surrender\` — Forfeit an active match\n\n` +
-        `🔤 *Word Chain (WCG)*  •  _Groups Only_\n` +
-        `High-stakes vocabulary battle featuring dynamic difficulty.\n` +
-        `• \`.wcg\` — Open a multiplayer lobby in a group\n` +
-        `• \`join\` — Enter an open game lobby\n` +
-        `• \`.wcg start\` — Force-start match (requires 2+ players)\n` +
-        `• \`<word>\` — Submit an English word on your turn\n` +
-        `• \`.wcg stats\` — View live match statistics & level\n` +
-        `• \`stop\` or \`.stop\` — Stop / cancel current match (or \`end\`)\n` +
-        `• \`surrender\` or \`.surrender\` — Forfeit your turn in match\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `💡 *Universal Controls:* Send *stop* or *surrender* (with or without \`.\`) anytime during any game!\n` +
-        `💡 *Navigation:* Type \`.help\` to view the main bot menu.`
     );
 }
 
@@ -198,7 +124,7 @@ function getQuickStartMenu(greeting) {
         `• *Generate Artwork:* \`.draw <prompt>\`\n` +
         `  _Example:_ \`.draw a futuristic neon supercar\`\n\n` +
         `• *Analyze Pictures:* Send/quote photo with \`.<question>\`\n\n` +
-        `• *Play Games:* Type \`.game\` to browse games\n\n` +
+        `• *Play Games:* Type \`.ttt\` for Tic-Tac-Toe or \`.wcg\` for Word Chain\n\n` +
         `• *Full Directory:* Type \`.help\` for complete command guide\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `🟢 *Status:* Online & Operational  |  ⚡ *Prefix:* \`.\``
@@ -495,11 +421,12 @@ async function connectToWhatsApp() {
                     return;
                 }
 
-                // Check for Game Menu command (.game / .games)
+                // Pointer for game commands (.game / .games)
                 if (/^(game|games)(\s|$)/i.test(promptText)) {
-                    const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
-                    const gameMenuText = getGameMenu(greeting);
-                    await sendGameMenuCard(socket, chatJid, gameMenuText, msg, isGroup ? [userJid] : []);
+                    await socket.sendMessage(chatJid, {
+                        text: `🎮 *Neo Games Directory:*\n\n• Type *.ttt* to open the Tic-Tac-Toe menu\n• Type *.wcg* to open the Word Chain Game menu`,
+                        mentions: isGroup ? [userJid] : []
+                    }, { quoted: msg });
                     return;
                 }
 

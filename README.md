@@ -57,16 +57,17 @@ Upon startup, if not already paired, Neo will generate an 8-character pairing co
 | Command | Action |
 |---|---|
 | `.<question>` | Ask Neo anything in DM or Group (e.g., `.Explain quantum computing simply`) |
-| `.game` / `.games` | Open dedicated Game Zone menu with bot game poster image |
-| `.ttt` | Create or join a Tic-Tac-Toe (X/O) game (multiplayer or solo vs AI) |
+| `.ttt` | Open Tic-Tac-Toe menu with instructions & commands |
+| `.ttt start` | Start or join a 2-player Tic-Tac-Toe match in group |
+| `.ttt bot` | Play solo Tic-Tac-Toe against Neo AI (works in DMs & groups) |
 | `1-9` or `.1-.9` | Place your mark on the Tic-Tac-Toe board during your turn |
-| `stop` / `.stop` / `end` | Stop and terminate any active game (works with or without dot) |
-| `surrender` / `.surrender` | Forfeit your active Tic-Tac-Toe or Word Chain game |
-| `.wcg` | Create a multiplayer Word Chain Game lobby (*Group Chats Only*) |
+| `.wcg` | Open Word Chain Game menu with instructions & rules |
+| `.wcg start` | Start a new Word Chain lobby in group (or force-start when 2+ joined) |
 | `join` | Join an open Word Chain Game lobby |
-| `.wcg start` | Force start a Word Chain match once 2+ players have joined |
 | `<word>` | Submit an English word starting with the target letter |
 | `.wcg stats` | View current Word Chain game statistics and progress |
+| `stop` / `.stop` / `end` | Stop and terminate any active game (works with or without dot) |
+| `surrender` / `.surrender` | Forfeit your active Tic-Tac-Toe or Word Chain game |
 | `.draw <prompt>` | Generate an AI image (e.g., `.draw an astronaut cat on Mars`) |
 | `.generate <prompt>` | Generate an AI image (e.g., `.generate cyberpunk neon city`) |
 | `[Image]` with `.<caption>` | Analyze or describe the attached image |

@@ -13,6 +13,71 @@ const __dirname = path.dirname(__filename);
 
 const WORD_LIST_URL = 'https://rawcdn.githack.com/dwyl/english-words/20f5cc9b3f0ccc8ce45d814c532b7c2031bba31c/words_alpha.txt';
 const LOCAL_WORDLIST_PATH = path.join(__dirname, 'assets', 'words_alpha.txt');
+const wcgImagePath = path.join(__dirname, 'assets', 'wcg-menu-image.jpg');
+
+let cachedWcgImage = null;
+
+function getWcgImage() {
+    if (cachedWcgImage) return cachedWcgImage;
+    try {
+        if (fs.existsSync(wcgImagePath)) {
+            cachedWcgImage = fs.readFileSync(wcgImagePath);
+            return cachedWcgImage;
+        }
+    } catch (err) {
+        console.error('[ASSETS] Error loading WCG menu image:', err.message);
+    }
+    return null;
+}
+
+export async function sendWcgMenuCard(socket, chatJid, captionText, quotedMsg, mentions = []) {
+    const imageBuffer = getWcgImage();
+    if (imageBuffer) {
+        try {
+            return await socket.sendMessage(chatJid, {
+                image: imageBuffer,
+                caption: captionText,
+                mentions: mentions
+            }, { quoted: quotedMsg });
+        } catch (imgErr) {
+            console.error('[ASSETS] Failed to send WCG menu image, falling back to text:', imgErr.message);
+        }
+    }
+    return await socket.sendMessage(chatJid, {
+        text: captionText,
+        mentions: mentions
+    }, { quoted: quotedMsg });
+}
+
+export function getWcgMenu(greeting, isGroup) {
+    return (
+        `*NEO ARCADE*  •  _Word Chain Game (WCG)_\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Welcome ${greeting}! Word Chain is an adrenaline-fueled vocabulary battle featuring dynamic difficulty and countdown turn timers.\n\n` +
+        `👥 *Note:* Word Chain is a multiplayer game designed for *Group Chats* (min 2 players).\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `*HOW TO PLAY*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `1. Start a lobby using \`.wcg start\` inside any group chat.\n` +
+        `2. Group members type \`join\` during the 60s countdown.\n` +
+        `3. Neo gives a starting letter (e.g. *B*). The active player must enter a valid English word (e.g. *Banana*).\n` +
+        `4. Next player must start with the *last letter* of that word (e.g. *Apple* from *A*).\n` +
+        `5. Words cannot be repeated. Difficulty escalates automatically (longer words, shorter timers!).\n` +
+        `6. Fail to answer before your timer runs out, and you're eliminated!\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `*GAME COMMANDS*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `• \`.wcg start\`   — Open a new lobby / start match in group (or \`.wcg play\`)\n` +
+        `• \`join\`         — Jump into an open lobby (no prefix needed)\n` +
+        `• \`<word>\`       — Reply with an English word on your turn\n` +
+        `• \`.wcg stats\`   — View live score, level, and longest word\n` +
+        `• \`stop\`         — Cancel or terminate the game (or \`.wcg end\`)\n` +
+        `• \`surrender\`    — Forfeit your turn in an active match\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 *Universal Controls:* \`stop\` and \`surrender\` work with or without a dot (\`.\`).\n` +
+        `💡 *Navigation:* Type \`.help\` for the main assistant directory.`
+    );
+}
 
 let WORD_SET = new Set();
 let isWordSetLoaded = false;
@@ -481,39 +546,14 @@ export function startTurnTimer(game, socket) {
  * Handles .wcg and wordchain commands
  */
 export async function handleWordChainCommand(socket, chatJid, userJid, pushName, commandText, msg, isGroup) {
-    if (!isGroup) {
-        await socket.sendMessage(chatJid, {
-            text: `👥 *Word Chain Game is a Group Game!*\n\nWord Chain is a multiplayer game designed for 2 or more players. Please run *.wcg* inside a WhatsApp group chat to play with friends!`,
-            mentions: [userJid]
-        }, { quoted: msg });
-        return;
-    }
-
     const parts = commandText.trim().split(/\s+/);
     const subCommand = (parts[1] || "").toLowerCase();
 
-    // 1. HELP COMMAND (.wcg help)
-    if (subCommand === 'help') {
-        const helpText =
-            `╭━━━〔 *WORD CHAIN GAME GUIDE* 〕━━━╮\n` +
-            `┃ Chain English words letter by letter! (Groups Only)\n` +
-            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-            `🎮 *Commands:*\n` +
-            `• *.wcg* - Start a new game lobby in a group\n` +
-            `• *join* - Join the waiting room\n` +
-            `• *.wcg start* - Force-start the game early (min 2 players)\n` +
-            `• *.wcg stats* - View current match statistics\n` +
-            `• *stop* or *.stop* - Stop / terminate the game (with/without prefix)\n` +
-            `• *surrender* or *.surrender* - Forfeit your turn in the match\n\n` +
-            `📖 *Rules of Play:*\n` +
-            `1. Neo gives you a starting letter (e.g. *B*).\n` +
-            `2. Player whose turn it is must reply with a valid English word starting with that letter (e.g. *Banana*).\n` +
-            `3. The next player must use the *last letter* of your word (e.g. *Apple* from *A*).\n` +
-            `4. No repeated words allowed!\n` +
-            `5. Difficulty increases automatically (longer words, faster timers!)\n` +
-            `6. If your timer runs out, you get eliminated!`;
-
-        await socket.sendMessage(chatJid, { text: helpText }, { quoted: msg });
+    // 1. MENU & HELP COMMAND (.wcg / .wcg help / .wcg menu)
+    if (!subCommand || subCommand === 'help' || subCommand === 'menu') {
+        const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
+        const menuText = getWcgMenu(greeting, isGroup);
+        await sendWcgMenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
         return;
     }
 
@@ -573,7 +613,7 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
     if (subCommand === 'join') {
         const game = activeGames.get(chatJid);
         if (!game) {
-            await socket.sendMessage(chatJid, { text: '❌ No game lobby to join! Type *.wcg* to start one.' }, { quoted: msg });
+            await socket.sendMessage(chatJid, { text: '❌ No game lobby to join! Type *.wcg start* to open one.' }, { quoted: msg });
             return;
         }
 
@@ -596,97 +636,30 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
         return;
     }
 
-    // 5. START COMMAND (.wcg start)
-    if (subCommand === 'start') {
-        const game = activeGames.get(chatJid);
-        if (!game) {
-            await socket.sendMessage(chatJid, { text: '❌ No game to start! Type *.wcg* to create a lobby first.' }, { quoted: msg });
-            return;
-        }
-
-        if (game.gameState !== 'waiting') {
-            await socket.sendMessage(chatJid, { text: '❌ Game is already running or completed!' }, { quoted: msg });
-            return;
-        }
-
-        if (game.players.length < 2) {
+    // 5. START / PLAY COMMAND (.wcg start / .wcg play)
+    if (subCommand === 'start' || subCommand === 'play') {
+        if (!isGroup) {
             await socket.sendMessage(chatJid, {
-                text: '❌ At least *2 players* are required to start! Ask friends to type *join*.'
+                text: `👥 *Word Chain Game is a Group Game!*\n\nWord Chain is a multiplayer game designed for 2 or more players. Please run *.wcg start* inside a WhatsApp group chat to play with friends!`,
+                mentions: [userJid]
             }, { quoted: msg });
             return;
         }
 
-        game.clearTimers();
-        game.gameState = 'active';
-        game.startTime = Date.now();
-        game.currentTurnStartTime = Date.now();
-        game.turnNumber = 1;
-        game.updateDifficulty();
+        // If a game already exists in this chat
+        if (activeGames.has(chatJid)) {
+            const game = activeGames.get(chatJid);
 
-        const statusMessage = getGameStatusMessage(game);
-        await socket.sendMessage(chatJid, statusMessage);
-        startTurnTimer(game, socket);
-        return;
-    }
+            // If lobby is currently waiting, check if we have enough players to force-start
+            if (game.gameState === 'waiting') {
+                if (game.players.length < 2) {
+                    await socket.sendMessage(chatJid, {
+                        text: `❌ At least *2 players* are required to start! Ask friends to type *join* (Current: ${game.players.length}).`
+                    }, { quoted: msg });
+                    return;
+                }
 
-    // 6. CREATE NEW GAME LOBBY (.wcg)
-    if (activeGames.has(chatJid)) {
-        const existing = activeGames.get(chatJid);
-        if (existing.gameState === 'waiting') {
-            await socket.sendMessage(chatJid, {
-                text: `⏳ A Word Chain lobby is already open!\n👉 Type *join* to participate, or *.wcg start* to begin!`
-            }, { quoted: msg });
-        } else {
-            await socket.sendMessage(chatJid, {
-                text: `🎮 A Word Chain game is already actively running in this chat!\nType *.wcg stats* for info or *.wcg end* to stop it.`
-            }, { quoted: msg });
-        }
-        return;
-    }
-
-    // Create fresh game instance
-    const game = new WordChainGame(chatJid);
-    // Auto-add the creator
-    game.addPlayer(userJid, pushName);
-    activeGames.set(chatJid, game);
-
-    const lobbyText =
-        `╭━━━〔 *WORD CHAIN GAME* 〕━━━╮\n` +
-        `🎮 *New Game Lobby Created!*\n` +
-        `👤 *Host:* ${mentionjid(userJid)}\n\n` +
-        `👉 Type *join* to enter the game!\n` +
-        `⚡ Needs *2 or more players* to play.\n` +
-        `⏳ Starting in *60 seconds* (or host types *.wcg start*)\n\n` +
-        `🔄 *Dynamic Difficulty:*\n` +
-        `🟢 *Beginner:* 3+ letters | 40s per turn\n` +
-        `⚫ *Master:* 6+ letters | 15s per turn\n` +
-        `⚡ Difficulty increases faster with fewer players!\n` +
-        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
-
-    await socket.sendMessage(chatJid, {
-        text: lobbyText,
-        mentions: [userJid]
-    }, { quoted: msg });
-
-    let countdown = 60;
-    game.joinTimer = setInterval(async () => {
-        countdown -= 15;
-        if (countdown > 0) {
-            let updateMessage =
-                `⏳ *Word Chain starts in ${countdown}s!*\n` +
-                `Type *join* to jump in! 🙋‍♂️🙋‍♀️\n` +
-                `👥 *Current Players (${game.players.length}):* ` +
-                game.players.map(p => mentionjid(p.id)).join(', ');
-
-            await socket.sendMessage(chatJid, {
-                text: updateMessage,
-                mentions: game.players.map(p => p.id)
-            });
-        } else {
-            clearInterval(game.joinTimer);
-            game.joinTimer = null;
-
-            if (game.players.length >= 2) {
+                game.clearTimers();
                 game.gameState = 'active';
                 game.startTime = Date.now();
                 game.currentTurnStartTime = Date.now();
@@ -696,14 +669,83 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
                 const statusMessage = getGameStatusMessage(game);
                 await socket.sendMessage(chatJid, statusMessage);
                 startTurnTimer(game, socket);
-            } else {
+                return;
+            }
+
+            if (game.gameState === 'active') {
                 await socket.sendMessage(chatJid, {
-                    text: '❌ *Not enough players joined!* Word Chain Game cancelled. (Requires at least 2 players)'
-                });
-                activeGames.delete(chatJid);
+                    text: `🎮 A Word Chain game is already actively running in this chat!\nType *.wcg stats* for info or *stop* to end it.`
+                }, { quoted: msg });
+                return;
             }
         }
-    }, 15000);
+
+        // Create fresh game instance and open new lobby
+        const game = new WordChainGame(chatJid);
+        game.addPlayer(userJid, pushName);
+        activeGames.set(chatJid, game);
+
+        const lobbyText =
+            `╭━━━〔 *WORD CHAIN GAME* 〕━━━╮\n` +
+            `🎮 *New Game Lobby Created!*\n` +
+            `👤 *Host:* ${mentionjid(userJid)}\n\n` +
+            `👉 Type *join* to enter the game!\n` +
+            `⚡ Needs *2 or more players* to play.\n` +
+            `⏳ Starting in *60 seconds* (or host types *.wcg start*)\n\n` +
+            `🔄 *Dynamic Difficulty:*\n` +
+            `🟢 *Beginner:* 3+ letters | 40s per turn\n` +
+            `⚫ *Master:* 6+ letters | 15s per turn\n` +
+            `⚡ Difficulty increases faster with fewer players!\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+
+        await socket.sendMessage(chatJid, {
+            text: lobbyText,
+            mentions: [userJid]
+        }, { quoted: msg });
+
+        let countdown = 60;
+        game.joinTimer = setInterval(async () => {
+            countdown -= 15;
+            if (countdown > 0) {
+                let updateMessage =
+                    `⏳ *Word Chain starts in ${countdown}s!*\n` +
+                    `Type *join* to jump in! 🙋‍♂️🙋‍♀️\n` +
+                    `👥 *Current Players (${game.players.length}):* ` +
+                    game.players.map(p => mentionjid(p.id)).join(', ');
+
+                await socket.sendMessage(chatJid, {
+                    text: updateMessage,
+                    mentions: game.players.map(p => p.id)
+                });
+            } else {
+                clearInterval(game.joinTimer);
+                game.joinTimer = null;
+
+                if (game.players.length >= 2) {
+                    game.gameState = 'active';
+                    game.startTime = Date.now();
+                    game.currentTurnStartTime = Date.now();
+                    game.turnNumber = 1;
+                    game.updateDifficulty();
+
+                    const statusMessage = getGameStatusMessage(game);
+                    await socket.sendMessage(chatJid, statusMessage);
+                    startTurnTimer(game, socket);
+                } else {
+                    await socket.sendMessage(chatJid, {
+                        text: '❌ *Not enough players joined!* Word Chain Game cancelled. (Requires at least 2 players)'
+                    });
+                    activeGames.delete(chatJid);
+                }
+            }
+        }, 15000);
+        return;
+    }
+
+    // Fallback: If unknown subcommand, show the menu
+    const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
+    const menuText = getWcgMenu(greeting, isGroup);
+    await sendWcgMenuCard(socket, chatJid, menuText, msg, isGroup ? [userJid] : []);
 }
 
 /**
@@ -804,14 +846,45 @@ export async function handleWordChainWord(socket, chatJid, userJid, pushName, ra
             return true;
         }
 
-        // Only process word submissions if it's the current player's turn
         const currentPlayer = game.getCurrentPlayer();
-        if (!currentPlayer || currentPlayer.id !== userJid) {
-            return false;
-        }
+        if (!currentPlayer) return false;
 
-        // If message is not a single word containing alphabets, ignore it (allows regular conversation)
-        if (!/^[a-zA-Z]+$/.test(text)) {
+        // If message is a single word containing alphabets
+        if (/^[a-zA-Z]+$/.test(text)) {
+            // Check if it's NOT the current player's turn
+            if (userJid !== currentPlayer.id) {
+                // Case A: Sender is an active player in this game
+                if (game.getActivePlayers().some(p => p.id === userJid)) {
+                    await reactToMessage(socket, chatJid, msg.key, '⏳');
+                    await socket.sendMessage(chatJid, {
+                        text: `❌ *Not your turn, @${userJid.split('@')[0]}!*\n⏳ It is currently @${currentPlayer.id.split('@')[0]}'s turn to chain a word starting with *${game.currentLetter}*.`,
+                        mentions: [userJid, currentPlayer.id]
+                    }, { quoted: msg });
+                    return true;
+                }
+
+                // Case B: Sender was eliminated in this game
+                if (game.players.some(p => p.id === userJid && p.eliminated)) {
+                    await reactToMessage(socket, chatJid, msg.key, '🚫');
+                    await socket.sendMessage(chatJid, {
+                        text: `🚫 @${userJid.split('@')[0]}, you have been eliminated from this match!\n⏳ Currently waiting for @${currentPlayer.id.split('@')[0]} to play.`,
+                        mentions: [userJid, currentPlayer.id]
+                    }, { quoted: msg });
+                    return true;
+                }
+
+                // Case C: Sender is not in the game, but typed a word starting with the target letter
+                if (text.charAt(0).toUpperCase() === game.currentLetter) {
+                    await socket.sendMessage(chatJid, {
+                        text: `⚠️ @${userJid.split('@')[0]}, you are not in this game!\n⏳ It is @${currentPlayer.id.split('@')[0]}'s turn. Wait for this round to end, then type *.wcg start* for the next match!`,
+                        mentions: [userJid, currentPlayer.id]
+                    }, { quoted: msg });
+                    return true;
+                }
+
+                return false;
+            }
+        } else {
             return false;
         }
 
