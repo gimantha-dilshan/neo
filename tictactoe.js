@@ -237,18 +237,21 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
         return;
     }
 
-    // 3. CANCEL WAITING ROOM (.ttt cancel)
-    if (subCommand === 'cancel' || subCommand === 'end') {
+    // 3. CANCEL / STOP / END COMMAND (.ttt cancel / .ttt end / .ttt stop)
+    if (subCommand === 'cancel' || subCommand === 'end' || subCommand === 'stop') {
         for (const [roomId, room] of games.entries()) {
-            if (room.chatJid === chatJid && room.game.playerX === userJid && room.state === 'WAITING') {
+            if (room.chatJid === chatJid && (room.game.playerX === userJid || room.game.playerO === userJid)) {
                 clearTimeout(room.timeout);
                 games.delete(roomId);
-                await socket.sendMessage(chatJid, { text: `🛑 *TicTacToe room cancelled.*` }, { quoted: msg });
+                const msgText = room.state === 'WAITING'
+                    ? `🛑 *TicTacToe room cancelled.*`
+                    : `🛑 *TicTacToe Game stopped by @${userJid.split('@')[0]}!*`;
+                await socket.sendMessage(chatJid, { text: msgText, mentions: [userJid] }, { quoted: msg });
                 return;
             }
         }
 
-        await socket.sendMessage(chatJid, { text: `❌ You do not have a waiting TicTacToe room to cancel.` }, { quoted: msg });
+        await socket.sendMessage(chatJid, { text: `❌ You do not have an active TicTacToe game to stop.` }, { quoted: msg });
         return;
     }
 
@@ -393,40 +396,54 @@ export async function handleTicTacToeCommand(socket, chatJid, userJid, pushName,
 }
 
 /**
- * Handles in-game moves (1-9) or surrender messages
+ * Handles in-game moves (1-9), stop/end, or surrender messages
  * Returns true if the message was handled as a TicTacToe action, false otherwise.
  */
 export async function handleTicTacToeMove(socket, chatJid, userJid, rawText, msg, isGroup) {
-    // Find active playing game for this user in this chat
-    let activeRoom = null;
-    let activeRoomId = null;
+    const textClean = (rawText || "").trim();
+    if (!textClean) return false;
+
+    // Find active (PLAYING or WAITING) game for this user in this chat
+    let targetRoom = null;
+    let targetRoomId = null;
 
     for (const [id, r] of games.entries()) {
         if (r.chatJid === chatJid &&
-            r.state === 'PLAYING' &&
             (r.game.playerX === userJid || r.game.playerO === userJid)) {
-            activeRoom = r;
-            activeRoomId = id;
+            targetRoom = r;
+            targetRoomId = id;
             break;
         }
     }
 
-    if (!activeRoom) return false;
+    if (!targetRoom) return false;
 
-    // Check for surrender
-    const isSurrender = /^(surrender|give\s*up|\.surrender|\.giveup|\.ttt\s+surrender)$/i.test(rawText.trim());
-
-    // Check for number move: 1-9 or .1-.9
-    const matchNumber = rawText.trim().match(/^\.?([1-9])$/);
-
-    if (!isSurrender && !matchNumber) {
-        return false;
+    // 1. Check for STOP or END (with or without prefix)
+    const isStop = /^(stop|end|cancel|\.stop|\.end|\.cancel|\.ttt\s+(stop|end|cancel))$/i.test(textClean);
+    if (isStop) {
+        clearTimeout(targetRoom.timeout);
+        games.delete(targetRoomId);
+        const statusText = targetRoom.state === 'WAITING'
+            ? `🛑 *TicTacToe waiting room cancelled.*`
+            : `🛑 *TicTacToe Game stopped by @${userJid.split('@')[0]}!*`;
+        await socket.sendMessage(chatJid, {
+            text: statusText,
+            mentions: [userJid]
+        }, { quoted: msg });
+        return true;
     }
 
-    // Handle Surrender
+    // 2. Check for SURRENDER (with or without prefix)
+    const isSurrender = /^(surrender|give\s*up|\.surrender|\.giveup|\.ttt\s+(surrender|give\s*up))$/i.test(textClean);
     if (isSurrender) {
-        clearTimeout(activeRoom.timeout);
-        const winner = userJid === activeRoom.game.playerX ? activeRoom.game.playerO : activeRoom.game.playerX;
+        clearTimeout(targetRoom.timeout);
+        if (targetRoom.state === 'WAITING') {
+            games.delete(targetRoomId);
+            await socket.sendMessage(chatJid, { text: `🛑 *Game Cancelled:* Waiting room deleted.` }, { quoted: msg });
+            return true;
+        }
+
+        const winner = userJid === targetRoom.game.playerX ? targetRoom.game.playerO : targetRoom.game.playerX;
         const isWinnerBot = winner === BOT_JID;
         const winnerTag = isWinnerBot ? '🤖 Neo (AI)' : `@${winner.split('@')[0]}`;
         const loserTag = userJid.split('@')[0];
@@ -436,9 +453,21 @@ export async function handleTicTacToeMove(socket, chatJid, userJid, rawText, msg
             mentions: isWinnerBot ? [userJid] : [userJid, winner]
         }, { quoted: msg });
 
-        games.delete(activeRoomId);
+        games.delete(targetRoomId);
         return true;
     }
+
+    // 3. Move handling (only valid when room state is PLAYING)
+    if (targetRoom.state !== 'PLAYING') return false;
+
+    // Check for number move: 1-9 or .1-.9
+    const matchNumber = textClean.match(/^\.?([1-9])$/);
+    if (!matchNumber) {
+        return false;
+    }
+
+    const activeRoom = targetRoom;
+    const activeRoomId = targetRoomId;
 
     // It's a move (1-9)
     const position = parseInt(matchNumber[1], 10) - 1;

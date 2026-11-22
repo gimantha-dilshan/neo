@@ -481,6 +481,14 @@ export function startTurnTimer(game, socket) {
  * Handles .wcg and wordchain commands
  */
 export async function handleWordChainCommand(socket, chatJid, userJid, pushName, commandText, msg, isGroup) {
+    if (!isGroup) {
+        await socket.sendMessage(chatJid, {
+            text: `👥 *Word Chain Game is a Group Game!*\n\nWord Chain is a multiplayer game designed for 2 or more players. Please run *.wcg* inside a WhatsApp group chat to play with friends!`,
+            mentions: [userJid]
+        }, { quoted: msg });
+        return;
+    }
+
     const parts = commandText.trim().split(/\s+/);
     const subCommand = (parts[1] || "").toLowerCase();
 
@@ -488,15 +496,15 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
     if (subCommand === 'help') {
         const helpText =
             `╭━━━〔 *WORD CHAIN GAME GUIDE* 〕━━━╮\n` +
-            `┃ Chain English words letter by letter!\n` +
+            `┃ Chain English words letter by letter! (Groups Only)\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
             `🎮 *Commands:*\n` +
-            `• *.wcg* - Start a new game lobby (creator is auto-joined)\n` +
-            `• *join* or *.wcg join* - Join the waiting room\n` +
+            `• *.wcg* - Start a new game lobby in a group\n` +
+            `• *join* - Join the waiting room\n` +
             `• *.wcg start* - Force-start the game early (min 2 players)\n` +
             `• *.wcg stats* - View current match statistics\n` +
-            `• *.wcg end* - Cancel / stop the current game\n` +
-            `• *surrender* - Forfeit your active turn/game\n\n` +
+            `• *stop* or *.stop* - Stop / terminate the game (with/without prefix)\n` +
+            `• *surrender* or *.surrender* - Forfeit your turn in the match\n\n` +
             `📖 *Rules of Play:*\n` +
             `1. Neo gives you a starting letter (e.g. *B*).\n` +
             `2. Player whose turn it is must reply with a valid English word starting with that letter (e.g. *Banana*).\n` +
@@ -509,8 +517,8 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
         return;
     }
 
-    // 2. END / CANCEL COMMAND (.wcg end / .wcg cancel / .endwcg)
-    if (subCommand === 'end' || subCommand === 'cancel' || parts[0].toLowerCase() === 'endwcg') {
+    // 2. END / STOP / CANCEL COMMAND (.wcg end / .wcg stop / .wcg cancel / .endwcg)
+    if (subCommand === 'end' || subCommand === 'stop' || subCommand === 'cancel' || parts[0].toLowerCase() === 'endwcg') {
         const game = activeGames.get(chatJid);
         if (!game) {
             await socket.sendMessage(chatJid, { text: '❌ No active Word Chain game in this chat!' }, { quoted: msg });
@@ -519,7 +527,10 @@ export async function handleWordChainCommand(socket, chatJid, userJid, pushName,
 
         game.clearTimers();
         activeGames.delete(chatJid);
-        await socket.sendMessage(chatJid, { text: '🛑 *Word Chain Game stopped by user.*' }, { quoted: msg });
+        await socket.sendMessage(chatJid, {
+            text: `🛑 *Word Chain Game stopped by ${mentionjid(userJid)}!*`,
+            mentions: [userJid]
+        }, { quoted: msg });
         return;
     }
 
@@ -710,8 +721,39 @@ export async function handleWordChainWord(socket, chatJid, userJid, pushName, ra
     if (!text) return false;
     const lower = text.toLowerCase();
 
-    // 1. LOBBY JOIN DETECTION ('join' or '.join')
+    // 1. Check for STOP or END (with or without prefix, e.g. stop, end, .stop, .end)
+    const isStop = /^(stop|end|cancel|\.stop|\.end|\.cancel|\.wcg\s+(stop|end|cancel))$/i.test(lower);
+    if (isStop) {
+        const isParticipant = game.players.some(p => p.id === userJid);
+        if (isParticipant || !isGroup) {
+            game.clearTimers();
+            activeGames.delete(chatJid);
+            await socket.sendMessage(chatJid, {
+                text: `🛑 *Word Chain Game stopped by ${mentionjid(userJid)}!*`,
+                mentions: [userJid]
+            }, { quoted: msg });
+            return true;
+        }
+    }
+
+    // 2. LOBBY JOIN DETECTION ('join' or '.join')
     if (game.gameState === 'waiting') {
+        // If user surrenders or leaves while waiting
+        const isSurrenderWaiting = /^(surrender|give\s*up|\.surrender|\.giveup|\.wcg\s+(surrender|give\s*up))$/i.test(lower);
+        if (isSurrenderWaiting) {
+            game.players = game.players.filter(p => p.id !== userJid);
+            await socket.sendMessage(chatJid, {
+                text: `👋 ${mentionjid(userJid)} left the game lobby. (${game.players.length} players remaining)`,
+                mentions: [userJid]
+            }, { quoted: msg });
+            if (game.players.length === 0) {
+                game.clearTimers();
+                activeGames.delete(chatJid);
+                await socket.sendMessage(chatJid, { text: `🛑 *Word Chain Game lobby closed (no players).*` });
+            }
+            return true;
+        }
+
         if (lower === 'join' || lower === '.join') {
             if (game.addPlayer(userJid, pushName)) {
                 await reactToMessage(socket, chatJid, msg.key, '👋');
@@ -730,10 +772,10 @@ export async function handleWordChainWord(socket, chatJid, userJid, pushName, ra
         return false;
     }
 
-    // 2. ACTIVE GAMEPLAY
+    // 3. ACTIVE GAMEPLAY
     if (game.gameState === 'active') {
         // Check for surrender by any player in this game
-        const isSurrender = /^(surrender|give\s*up|\.surrender|\.wcg\s+surrender)$/i.test(lower);
+        const isSurrender = /^(surrender|give\s*up|\.surrender|\.giveup|\.wcg\s+(surrender|give\s*up))$/i.test(lower);
         if (isSurrender) {
             const player = game.players.find(p => p.id === userJid && !p.eliminated);
             if (!player) return false;

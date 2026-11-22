@@ -167,18 +167,19 @@ function getGameMenu(greeting) {
         `• \`.ttt @user\` — Challenge a specific player\n` +
         `• \`.ttt bot\` — Play solo against Neo AI\n` +
         `• \`1\` to \`9\` — Place your symbol on your turn\n` +
-        `• \`.ttt cancel\` — Close a waiting lobby\n` +
-        `• \`surrender\` — Forfeit an active match\n\n` +
-        `🔤 *Word Chain (WCG)*\n` +
+        `• \`stop\` or \`.stop\` — Stop / cancel active game (or \`end\`)\n` +
+        `• \`surrender\` or \`.surrender\` — Forfeit an active match\n\n` +
+        `🔤 *Word Chain (WCG)*  •  _Groups Only_\n` +
         `High-stakes vocabulary battle featuring dynamic difficulty.\n` +
-        `• \`.wcg\` — Create a new multiplayer lobby\n` +
+        `• \`.wcg\` — Open a multiplayer lobby in a group\n` +
         `• \`join\` — Enter an open game lobby\n` +
         `• \`.wcg start\` — Force-start match (requires 2+ players)\n` +
         `• \`<word>\` — Submit an English word on your turn\n` +
         `• \`.wcg stats\` — View live match statistics & level\n` +
-        `• \`.wcg end\` — Stop / terminate current match\n` +
-        `• \`surrender\` — Forfeit your turn / match\n\n` +
+        `• \`stop\` or \`.stop\` — Stop / cancel current match (or \`end\`)\n` +
+        `• \`surrender\` or \`.surrender\` — Forfeit your turn in match\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 *Universal Controls:* Send *stop* or *surrender* (with or without \`.\`) anytime during any game!\n` +
         `💡 *Navigation:* Type \`.help\` to view the main bot menu.`
     );
 }
@@ -511,6 +512,23 @@ async function connectToWhatsApp() {
                 // Check for Word Chain game command (.wcg / .wordchain / .endwcg / .wcgstats)
                 if (/^(wcg|wordchain|endwcg|wcgstats)(\s|$)/i.test(promptText)) {
                     await handleWordChainCommand(socket, chatJid, userJid, pushName, promptText, msg, isGroup);
+                    return;
+                }
+
+                // Fallback for stop / end / surrender if no game was intercepted above
+                if (/^(stop|end)$/i.test(promptText)) {
+                    await socket.sendMessage(chatJid, {
+                        text: "❌ No active game running in this chat to stop.",
+                        mentions: isGroup ? [userJid] : []
+                    }, { quoted: msg });
+                    return;
+                }
+
+                if (/^(surrender|giveup)$/i.test(promptText)) {
+                    await socket.sendMessage(chatJid, {
+                        text: "❌ You are not currently in an active game to surrender.",
+                        mentions: isGroup ? [userJid] : []
+                    }, { quoted: msg });
                     return;
                 }
 
