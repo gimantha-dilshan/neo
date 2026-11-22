@@ -57,6 +57,7 @@ Upon startup, if not already paired, Neo will generate an 8-character pairing co
 | Command | Action |
 |---|---|
 | `.<question>` | Ask Neo anything in DM or Group (e.g., `.Explain quantum computing simply`) |
+| `.game` / `.games` | Open dedicated Game Zone menu with bot game poster image |
 | `.ttt` | Create or join a Tic-Tac-Toe (X/O) game in the chat |
 | `.ttt cancel` | Cancel a game room you created |
 | `1-9` or `.1-.9` | Place your mark on the Tic-Tac-Toe board during your turn |

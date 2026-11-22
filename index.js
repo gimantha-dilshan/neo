@@ -31,11 +31,13 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const botImagePath = path.join(__dirname, 'assets', 'bot-menu-image.jpg');
+const botGameImagePath = path.join(__dirname, 'assets', 'bot-game-menu.jpg');
 
 let cachedBotImage = null;
+let cachedBotGameImage = null;
 
 /**
- * Loads and caches the bot menu image buffer from assets/bot-image.jpg
+ * Loads and caches the bot menu image buffer from assets/bot-menu-image.jpg
  */
 function getBotImage() {
     if (cachedBotImage) return cachedBotImage;
@@ -51,7 +53,23 @@ function getBotImage() {
 }
 
 /**
- * Sends a rich menu card with bot-image.jpg if available, falling back to text
+ * Loads and caches the bot game menu image buffer from assets/bot-game-menu.jpg
+ */
+function getBotGameImage() {
+    if (cachedBotGameImage) return cachedBotGameImage;
+    try {
+        if (fs.existsSync(botGameImagePath)) {
+            cachedBotGameImage = fs.readFileSync(botGameImagePath);
+            return cachedBotGameImage;
+        }
+    } catch (err) {
+        console.error('[ASSETS] Error loading game menu image:', err.message);
+    }
+    return null;
+}
+
+/**
+ * Sends a rich menu card with bot-menu-image.jpg if available, falling back to text
  */
 async function sendMenuCard(socket, chatJid, captionText, quotedMsg, mentions = []) {
     const imageBuffer = getBotImage();
@@ -73,64 +91,95 @@ async function sendMenuCard(socket, chatJid, captionText, quotedMsg, mentions = 
 }
 
 /**
+ * Sends a rich game menu card with bot-game-menu.jpg if available, falling back to text
+ */
+async function sendGameMenuCard(socket, chatJid, captionText, quotedMsg, mentions = []) {
+    const imageBuffer = getBotGameImage();
+    if (imageBuffer) {
+        try {
+            return await socket.sendMessage(chatJid, {
+                image: imageBuffer,
+                caption: captionText,
+                mentions: mentions
+            }, { quoted: quotedMsg });
+        } catch (imgErr) {
+            console.error('[ASSETS] Failed to send game menu image, falling back to text:', imgErr.message);
+        }
+    }
+    return await socket.sendMessage(chatJid, {
+        text: captionText,
+        mentions: mentions
+    }, { quoted: quotedMsg });
+}
+
+/**
  * Formats the comprehensive .help / .menu card
  */
 function getHelpMenu(greeting) {
     return (
-        `╭━━━〔 *NEO AI ASSISTANT* 〕━━━╮\n` +
-        `┃  _Intelligent • Fast • Creative_\n` +
-        `╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-        `👋 Hello, ${greeting}! I am *Neo*, your smart AI WhatsApp assistant powered by AI.\n\n` +
-        `⚡ *Command Prefix:* \`.\` (Always start commands with a dot)\n\n` +
-        `╭───『 *💬 AI CHAT & ANSWERS* 』\n` +
-        `│ ✦ \`.<question>\`\n` +
-        `│   └ Ask anything: facts, math, science, advice\n` +
-        `│   _e.g._ \`.Explain quantum computing simply\`\n` +
-        `│ ✦ \`.<coding / writing / translate>\`\n` +
-        `│   └ Code generation, debugging, essays & translation\n` +
-        `│   _e.g._ \`.Write a Python script to scrape a website\`\n` +
-        `╰──────────────────────────\n\n` +
-        `╭───『 *🎨 AI IMAGE GENERATOR* 』\n` +
-        `│ ✦ \`.draw <prompt>\`\n` +
-        `│   └ Generate stunning AI artwork and illustrations\n` +
-        `│   _e.g._ \`.draw a cyberpunk samurai in rainy Tokyo\`\n` +
-        `│ ✦ _Aliases:_ \`.generate\`, \`.imagine\`, \`.img\`\n` +
-        `╰──────────────────────────\n\n` +
-        `╭───『 *👁️ VISION & IMAGE ANALYSIS* 』\n` +
-        `│ ✦ *Send an image* with caption \`.<question>\`\n` +
-        `│   └ Identify objects, solve math problems, describe scenes\n` +
-        `│ ✦ *Reply to an image* with \`.<question>\`\n` +
-        `│   └ Ask questions about any picture in the chat\n` +
-        `╰──────────────────────────\n\n` +
-        `╭───『 *🎮 TIC-TAC-TOE GAME* 』\n` +
-        `│ ✦ \`.ttt\`\n` +
-        `│   └ Create or join a Tic-Tac-Toe match\n` +
-        `│ ✦ \`.ttt @user\`\n` +
-        `│   └ Challenge a specific friend in the group\n` +
-        `│ ✦ \`.ttt bot\`\n` +
-        `│   └ Play solo against Neo AI\n` +
-        `│ ✦ \`1\` - \`9\` or \`.1\` - \`.9\`\n` +
-        `│   └ Choose a grid position during your turn\n` +
-        `│ ✦ \`.ttt cancel\` / \`.surrender\`\n` +
-        `│   └ Cancel game room or forfeit active match\n` +
-        `╰──────────────────────────\n\n` +
-        `╭───『 *🔤 WORD CHAIN GAME* 』\n` +
-        `│ ✦ \`.wcg\`\n` +
-        `│   └ Start a multiplayer Word Chain game lobby\n` +
-        `│ ✦ *join* or \`.wcg join\`\n` +
-        `│   └ Join an active game lobby (min 2 players)\n` +
-        `│ ✦ \`.wcg start\`\n` +
-        `│   └ Start game immediately when players join\n` +
-        `│ ✦ \`.wcg stats\` / \`.wcg end\`\n` +
-        `│   └ View live statistics or cancel the match\n` +
-        `│ ✦ *surrender*\n` +
-        `│   └ Forfeit your turn in an active match\n` +
-        `╰──────────────────────────\n\n` +
-        `╭───『 *⚙️ UTILITIES & STATUS* 』\n` +
-        `│ ✦ \`.ping\`  ― Test latency & check if Neo is online\n` +
-        `│ ✦ \`.help\`  ― Open this detailed menu (alias: \`.menu\`)\n` +
-        `│ ✦ \`.\`      ― Quick status & welcome card\n` +
-        `╰──────────────────────────\n\n`
+        `*NEO AI ASSISTANT*  •  _Command Directory_\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Hello ${greeting}, welcome to *Neo* — your next-generation AI companion for intelligent chat, creative tools, and multiplayer entertainment.\n\n` +
+        `⚡ *Command Prefix:* \`.\` _(e.g. \`.ping\`)_\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `*CORE CAPABILITIES*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `💬 *AI Intelligence & Chat*\n` +
+        `• \`.<question>\`\n` +
+        `  Ask anything: science, coding, math, research & advice.\n` +
+        `  _Example:_ \`.Explain relativity in simple terms\`\n\n` +
+        `🎨 *Studio & Art Generation*\n` +
+        `• \`.draw <prompt>\`\n` +
+        `  Generate high-fidelity AI illustrations and concept art.\n` +
+        `  _Example:_ \`.draw a cyberpunk samurai in rainy Tokyo\`\n` +
+        `  _Aliases:_ \`.imagine\` • \`.generate\` • \`.img\`\n\n` +
+        `👁️ *Vision & Multimodal Analysis*\n` +
+        `• Send image with \`.<question>\` in caption\n` +
+        `• Reply to any picture with \`.<question>\`\n` +
+        `  Identify objects, extract text, and solve equations.\n\n` +
+        `🎮 *Arcade & Multiplayer*\n` +
+        `• \`.game\` _(or \`.games\`)_\n` +
+        `  Open the Game Zone for Tic-Tac-Toe, Word Chain, and AI solo matches.\n\n` +
+        `⚙️ *System & Diagnostics*\n` +
+        `• \`.ping\`  — Test response latency & operational status\n` +
+        `• \`.help\`  — Display this comprehensive directory\n` +
+        `• \`.\`      — Quick summary & welcome card\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `🟢 *Status:* Online & Active  |  🌐 *Engine:* Gemini AI\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━`
+    );
+}
+
+/**
+ * Formats the dedicated game menu card (.game / .games)
+ */
+function getGameMenu(greeting) {
+    return (
+        `*NEO ARCADE*  •  _Game Zone_\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Welcome to the Arcade, ${greeting}! Challenge your friends in group chats or test your skills solo against Neo AI.\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `*AVAILABLE TITLES*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `🕹️ *Tic-Tac-Toe (X/O)*\n` +
+        `Classic 3x3 strategy game with smart AI and multiplayer.\n` +
+        `• \`.ttt\` — Create or accept an open challenge\n` +
+        `• \`.ttt @user\` — Challenge a specific player\n` +
+        `• \`.ttt bot\` — Play solo against Neo AI\n` +
+        `• \`1\` to \`9\` — Place your symbol on your turn\n` +
+        `• \`.ttt cancel\` — Close a waiting lobby\n` +
+        `• \`surrender\` — Forfeit an active match\n\n` +
+        `🔤 *Word Chain (WCG)*\n` +
+        `High-stakes vocabulary battle featuring dynamic difficulty.\n` +
+        `• \`.wcg\` — Create a new multiplayer lobby\n` +
+        `• \`join\` — Enter an open game lobby\n` +
+        `• \`.wcg start\` — Force-start match (requires 2+ players)\n` +
+        `• \`<word>\` — Submit an English word on your turn\n` +
+        `• \`.wcg stats\` — View live match statistics & level\n` +
+        `• \`.wcg end\` — Stop / terminate current match\n` +
+        `• \`surrender\` — Forfeit your turn / match\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 *Navigation:* Type \`.help\` to view the main bot menu.`
     );
 }
 
@@ -139,28 +188,19 @@ function getHelpMenu(greeting) {
  */
 function getQuickStartMenu(greeting) {
     return (
-        `╭━━━〔 *NEO AI ASSISTANT* 〕━━━╮\n` +
-        `┃      _Ready to Assist You_\n` +
-        `╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-        `👋 Hey ${greeting}! I am *Neo*, your personal AI companion.\n\n` +
-        `I am listening and ready to help! You can ask questions, generate artwork, analyze photos, or play games.\n\n` +
-        `🚀 *Quick Start Guide:*\n` +
-        `▫️ *Ask me anything:*\n` +
-        `   Type \`.\` followed by your question\n` +
-        `   _Example:_ \`.Tell me an interesting space fact\`\n\n` +
-        `▫️ *Generate an image:*\n` +
-        `   Type \`.draw\` followed by your prompt\n` +
-        `   _Example:_ \`.draw a cute futuristic robot pet\`\n\n` +
-        `▫️ *Analyze an image:*\n` +
-        `   Send or reply to an image with a \`.\` caption\n\n` +
-        `▫️ *Play a game:*\n` +
-        `   Type \`.ttt\` for Tic-Tac-Toe or \`.wcg\` for Word Chain\n\n` +
-        `▫️ *Full Menu & Commands:*\n` +
-        `   Type \`.help\` for the complete guide\n\n` +
-        `══════════════════════════\n` +
-        `🟢 *Status:* Online & Operational\n` +
-        `⚡ *Prefix:* \`.\` (Dot)\n` +
-        `══════════════════════════`
+        `*NEO AI ASSISTANT*  •  _Quick Access_\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Hello ${greeting}! Neo is online and ready to assist you.\n\n` +
+        `*FAST ACTIONS*\n` +
+        `• *Ask Questions:* \`.\` followed by your message\n` +
+        `  _Example:_ \`.Tell me an interesting space fact\`\n\n` +
+        `• *Generate Artwork:* \`.draw <prompt>\`\n` +
+        `  _Example:_ \`.draw a futuristic neon supercar\`\n\n` +
+        `• *Analyze Pictures:* Send/quote photo with \`.<question>\`\n\n` +
+        `• *Play Games:* Type \`.game\` to browse games\n\n` +
+        `• *Full Directory:* Type \`.help\` for complete command guide\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `🟢 *Status:* Online & Operational  |  ⚡ *Prefix:* \`.\``
     );
 }
 
@@ -451,6 +491,14 @@ async function connectToWhatsApp() {
                         text: "🏓 *Pong!* Neo is online and running smoothly.",
                         mentions: isGroup ? [userJid] : []
                     }, { quoted: msg });
+                    return;
+                }
+
+                // Check for Game Menu command (.game / .games)
+                if (/^(game|games)(\s|$)/i.test(promptText)) {
+                    const greeting = isGroup ? `@${userJid.split('@')[0]}` : `*${pushName}*`;
+                    const gameMenuText = getGameMenu(greeting);
+                    await sendGameMenuCard(socket, chatJid, gameMenuText, msg, isGroup ? [userJid] : []);
                     return;
                 }
 
