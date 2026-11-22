@@ -16,6 +16,7 @@ import pino from 'pino';
 import readline from 'readline';
 import { askGemini, generateAIImage } from './gemini.js';
 import { handleTicTacToeCommand, handleTicTacToeMove } from './tictactoe.js';
+import { handleWordChainCommand, handleWordChainWord, initWordChain } from './wordchain.js';
 import {
     initDB,
     saveMessage,
@@ -113,6 +114,18 @@ function getHelpMenu(greeting) {
         `│ ✦ \`.ttt cancel\` / \`.surrender\`\n` +
         `│   └ Cancel game room or forfeit active match\n` +
         `╰──────────────────────────\n\n` +
+        `╭───『 *🔤 WORD CHAIN GAME* 』\n` +
+        `│ ✦ \`.wcg\`\n` +
+        `│   └ Start a multiplayer Word Chain game lobby\n` +
+        `│ ✦ *join* or \`.wcg join\`\n` +
+        `│   └ Join an active game lobby (min 2 players)\n` +
+        `│ ✦ \`.wcg start\`\n` +
+        `│   └ Start game immediately when players join\n` +
+        `│ ✦ \`.wcg stats\` / \`.wcg end\`\n` +
+        `│   └ View live statistics or cancel the match\n` +
+        `│ ✦ *surrender*\n` +
+        `│   └ Forfeit your turn in an active match\n` +
+        `╰──────────────────────────\n\n` +
         `╭───『 *⚙️ UTILITIES & STATUS* 』\n` +
         `│ ✦ \`.ping\`  ― Test latency & check if Neo is online\n` +
         `│ ✦ \`.help\`  ― Open this detailed menu (alias: \`.menu\`)\n` +
@@ -141,7 +154,7 @@ function getQuickStartMenu(greeting) {
         `▫️ *Analyze an image:*\n` +
         `   Send or reply to an image with a \`.\` caption\n\n` +
         `▫️ *Play a game:*\n` +
-        `   Type \`.ttt\` to start Tic-Tac-Toe\n\n` +
+        `   Type \`.ttt\` for Tic-Tac-Toe or \`.wcg\` for Word Chain\n\n` +
         `▫️ *Full Menu & Commands:*\n` +
         `   Type \`.help\` for the complete guide\n\n` +
         `══════════════════════════\n` +
@@ -258,6 +271,7 @@ async function downloadMedia(mediaMessage, type = 'image') {
 async function connectToWhatsApp() {
     printHeader();
     await initDB();
+    await initWordChain();
 
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     const { version, isLatest } = await fetchLatestBaileysVersion();
@@ -417,6 +431,10 @@ async function connectToWhatsApp() {
                 if (text) {
                     const isTttMove = await handleTicTacToeMove(socket, chatJid, userJid, text, msg, isGroup);
                     if (isTttMove) return;
+
+                    // Check if message is a Word Chain word, lobby join, or surrender
+                    const isWcgAction = await handleWordChainWord(socket, chatJid, userJid, pushName, text, msg, isGroup);
+                    if (isWcgAction) return;
                 }
 
                 // If text does not start with '.', IGNORE IT!
@@ -439,6 +457,12 @@ async function connectToWhatsApp() {
                 // Check for TicTacToe game command (.ttt / .tictactoe)
                 if (/^(ttt|tictactoe)(\s|$)/i.test(promptText)) {
                     await handleTicTacToeCommand(socket, chatJid, userJid, pushName, promptText, msg, isGroup);
+                    return;
+                }
+
+                // Check for Word Chain game command (.wcg / .wordchain / .endwcg / .wcgstats)
+                if (/^(wcg|wordchain|endwcg|wcgstats)(\s|$)/i.test(promptText)) {
+                    await handleWordChainCommand(socket, chatJid, userJid, pushName, promptText, msg, isGroup);
                     return;
                 }
 
