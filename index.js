@@ -29,12 +29,12 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const botImagePath = path.join(__dirname, 'assets', 'bot-image.jpeg');
+const botImagePath = path.join(__dirname, 'assets', 'bot-image.jpg');
 
 let cachedBotImage = null;
 
 /**
- * Loads and caches the bot menu image buffer from assets/bot-image.jpeg
+ * Loads and caches the bot menu image buffer from assets/bot-image.jpg
  */
 function getBotImage() {
     if (cachedBotImage) return cachedBotImage;
@@ -50,7 +50,7 @@ function getBotImage() {
 }
 
 /**
- * Sends a rich menu card with bot-image.jpeg if available, falling back to text
+ * Sends a rich menu card with bot-image.jpg if available, falling back to text
  */
 async function sendMenuCard(socket, chatJid, captionText, quotedMsg, mentions = []) {
     const imageBuffer = getBotImage();
@@ -79,7 +79,7 @@ function getHelpMenu(greeting) {
         `╭━━━〔 *NEO AI ASSISTANT* 〕━━━╮\n` +
         `┃  _Intelligent • Fast • Creative_\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-        `👋 Hello, ${greeting}! I am *Neo*, your smart AI WhatsApp assistant powered by Google Gemini.\n\n` +
+        `👋 Hello, ${greeting}! I am *Neo*, your smart AI WhatsApp assistant powered by AI.\n\n` +
         `⚡ *Command Prefix:* \`.\` (Always start commands with a dot)\n\n` +
         `╭───『 *💬 AI CHAT & ANSWERS* 』\n` +
         `│ ✦ \`.<question>\`\n` +
