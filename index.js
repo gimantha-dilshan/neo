@@ -29,7 +29,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const botImagePath = path.join(__dirname, 'assets', 'bot-image.jpg');
+const botImagePath = path.join(__dirname, 'assets', 'bot-menu-image.jpg');
 
 let cachedBotImage = null;
 
