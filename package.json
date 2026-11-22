@@ -1,0 +1,30 @@
+{
+  "name": "neo",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "General AI WhatsApp bot named Neo powered by Gemini",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "neo",
+    "baileys",
+    "gemini",
+    "ai"
+  ],
+  "author": "Gimantha Dilshan",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^1.46.0",
+    "@supabase/supabase-js": "^2.100.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "dotenv": "^17.3.1",
+    "mime-types": "^3.0.2",
+    "pino": "^10.3.1",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
