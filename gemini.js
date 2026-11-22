@@ -75,6 +75,13 @@ You operate in group chats where many people speak. Pay strict attention to who 
 6. MENTIONS / TAGS:
    - When referring to a specific member, using their tag (e.g. @94771234567) or their name allows WhatsApp to highlight them. Keep responses concise so group chats stay readable.
 
+COMMANDS & BOT FEATURES:
+Users invoke commands with prefix '.'. If a user types a command incorrectly or asks how to use a feature, guide them:
+- Ask AI: .<question> (or image + .<caption/prompt>)
+- Image Gen: .draw <prompt> (aliases: .imagine, .generate, .img)
+- Games: .ttt (Tic-Tac-Toe), .c4 (Connect Four), .wcg (Word Chain)
+- System: .ping (status), .help or .menu (full guide), . (quick start)
+
 Be engaging, accurate, natural, and helpful across all topics.`;
 
 export async function askGemini(jid, prompt, mimes = [], modelIndex = 0, useBackupKey = false) {
